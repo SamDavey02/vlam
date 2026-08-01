@@ -5,6 +5,7 @@ from rclpy.node import Node
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+import cv2
 
 
 class Controller(Node):
@@ -35,9 +36,12 @@ class Controller(Node):
             	desired_encoding='rgb8'
         	)
 
-        	self.get_logger().info(
-            	f"Received image: {frame.shape}"
-        	)
+        	#self.get_logger().info(
+            	#f"Received image: {frame.shape}"
+        	#)
+        	
+        	cv2.imshow("RealSense RGB", frame)
+        	cv2.waitKey(1)
 
     	except Exception as e:
         	self.get_logger().error(
