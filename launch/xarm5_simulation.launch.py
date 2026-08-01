@@ -12,9 +12,12 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 
+from launch_ros.actions import Node
+
 
 def generate_launch_description():
     hw_ns = LaunchConfiguration('hw_ns', default='xarm')
+    
     
     # robot moveit gazebo launch
     # xarm_moveit_config/launch/_robot_moveit_gazebo.launch.py
@@ -31,6 +34,15 @@ def generate_launch_description():
         }.items(),
     )
     
+    #defines the controller node
+    controller_node = Node(
+    package='valm',
+    executable='controller',
+    name='controller',
+    output='screen'
+    )
+
     return LaunchDescription([
-        robot_moveit_gazebo_launch
+        robot_moveit_gazebo_launch,
+        controller_node,
     ])
