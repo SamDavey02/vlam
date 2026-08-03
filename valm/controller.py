@@ -40,6 +40,8 @@ class Controller(Node):
             	#f"Received image: {frame.shape}"
         	#)
         	
+        	frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        	
         	cv2.imshow("RealSense RGB", frame)
         	cv2.waitKey(1)
 
