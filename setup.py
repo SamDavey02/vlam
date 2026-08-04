@@ -15,6 +15,10 @@ setup(
         
         (os.path.join('share', package_name, 'launch'),
         glob('launch/*.launch.py'),),
+        
+        #path to world folder
+        (os.path.join('share', package_name, 'worlds'), glob('worlds/*.world')),
+        
     ],
     install_requires=['setuptools'],
     zip_safe=True,

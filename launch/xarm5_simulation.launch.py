@@ -22,7 +22,10 @@ def generate_launch_description():
     # robot moveit gazebo launch
     # xarm_moveit_config/launch/_robot_moveit_gazebo.launch.py
     robot_moveit_gazebo_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(PathJoinSubstitution([FindPackageShare('xarm_moveit_config'), 'launch', '_robot_moveit_gazebo.launch.py'])),
+    
+    	#changed to valm package (was xarm_moveit_config) 
+        PythonLaunchDescriptionSource(PathJoinSubstitution([FindPackageShare('valm'), 'launch', '_robot_moveit_gazebo.launch.py'])),
+        
         launch_arguments={
             'dof': '5',
             'robot_type': 'xarm',
@@ -31,6 +34,10 @@ def generate_launch_description():
             
             'add_gripper': 'True',
             'add_realsense_d435i': 'True',
+            
+            #chooses the world
+            'world': PathJoinSubstitution([FindPackageShare('valm'), 'worlds', 'default_xarm5.world']),
+            
         }.items(),
     )
     
