@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+
+<sdf version="1.6">
+
+  <model name="lettuce">
+
+    <static>false</static>
+
+    <link name="link">
+
+      <visual name="visual">
+
+        <geometry>
+          <mesh>
+            <uri>model://lettuce/meshes/Head_of_Lettuce_01.obj</uri>
+            <scale>0.02 0.02 0.02</scale>
+          </mesh>
+        </geometry>
+
+      </visual>
+
+
+      <collision name="collision">
+
+        <geometry>
+          <mesh>
+            <uri>model://lettuce/meshes/Head_of_Lettuce_01.obj</uri>
+            <scale>0.02 0.02 0.02</scale>
+          </mesh>
+        </geometry>
+
+      </collision>
+
+    </link>
+
+  </model>
+
+</sdf>

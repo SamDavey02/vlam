@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+
+<sdf version="1.6">
+
+  <model name="sliced_bread">
+
+    <static>false</static>
+
+    <link name="link">
+
+      <visual name="visual">
+
+        <geometry>
+          <mesh>
+            <uri>model://sliced_bread/meshes/model.obj</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+
+      </visual>
+
+
+      <collision name="collision">
+
+        <geometry>
+          <mesh>
+            <uri>model://sliced_bread/meshes/model.obj</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+
+      </collision>
+
+    </link>
+
+  </model>
+
+</sdf>

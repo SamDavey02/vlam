@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+
+<sdf version="1.6">
+
+  <model name="sliced_tomato">
+
+    <static>false</static>
+
+    <link name="link">
+
+      <visual name="visual">
+
+        <geometry>
+          <mesh>
+            <uri>model://sliced_tomato/meshes/CHAHIN_TOMATO_SLICE.obj</uri>
+            <scale>0.1 0.1 0.1</scale>
+          </mesh>
+        </geometry>
+
+      </visual>
+
+
+      <collision name="collision">
+
+        <geometry>
+          <mesh>
+            <uri>model://sliced_tomato/meshes/CHAHIN_TOMATO_SLICE.obj</uri>
+            <scale>0.1 0.1 0.1</scale>
+          </mesh>
+        </geometry>
+
+      </collision>
+
+    </link>
+
+  </model>
+
+</sdf>

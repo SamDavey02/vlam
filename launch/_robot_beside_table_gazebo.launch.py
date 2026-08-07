@@ -256,8 +256,8 @@ def launch_setup(context, *args, **kwargs):
         )
     else:
     
-    	#points to the world to use
-        gazebo_world = PathJoinSubstitution([FindPackageShare('valm'), 'worlds', 'default_xarm5.world'])  
+    	#points to the world to use----------------------------------------------------------------------------------------------------
+        gazebo_world = PathJoinSubstitution([FindPackageShare('valm'), 'worlds', 'vision_test.world'])  
         
         # gazebo_ros/launch/gazebo.launch.py
         gazebo_launch = IncludeLaunchDescription(
