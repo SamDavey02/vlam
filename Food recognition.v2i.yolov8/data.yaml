@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 58
+names: ['apple', 'asparagus', 'avocado', 'banana', 'banana slice', 'beacon', 'beans', 'beef steak', 'blueberry', 'boiled potato', 'bread', 'broccoli', 'cacao drink', 'carrot', 'cauliflower', 'champignon mushrooms', 'cheese', 'cheese slice', 'cherry', 'corn', 'cucumber raw', 'cucumber sliced', 'egg boiled', 'egg raw', 'frayed chicken', 'frayed potatoe', 'fryed egg', 'garlic', 'grapes', 'kiwi', 'lemon', 'lettuce', 'lime', 'mango', 'mashed potatoes', 'omelette', 'onion', 'orange', 'orange juice', 'pancake', 'pineapple', 'plum red', 'potato fries', 'potatoe chip', 'raspberry', 'raw potatoes', 'red pepper', 'rice', 'sausage', 'sliced bread', 'sliced tomatoe', 'strawberry', 'strawberry sliced', 'stream beens', 'toast bread', 'tomato', 'unpeal banana', 'white chocolate']
+
+roboflow:
+  workspace: sam-davey
+  project: food-recognition-shqj6-jc28c
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/sam-davey/food-recognition-shqj6-jc28c/dataset/2

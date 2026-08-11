@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['Cheese']
+
+roboflow:
+  workspace: sam-davey
+  project: cheese-is8af-8tdzk
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/sam-davey/cheese-is8af-8tdzk/dataset/1
