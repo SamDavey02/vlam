@@ -34,6 +34,8 @@ setup(
     entry_points={
         'console_scripts': [
             'controller = valm.controller:main',
+            'vision = valm.vision:main',
+            'capture_images = valm.capture_images:main',  #for getting the gazebo images
         ],
     },
 )

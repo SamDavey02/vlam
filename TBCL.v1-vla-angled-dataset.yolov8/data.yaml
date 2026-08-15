@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['cheese', 'lettuce', 'sliced_bread', 'sliced_tomato']
+
+roboflow:
+  workspace: sam-davey
+  project: tbcl
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/sam-davey/tbcl/dataset/1

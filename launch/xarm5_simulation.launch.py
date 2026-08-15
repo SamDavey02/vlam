@@ -36,7 +36,7 @@ def generate_launch_description():
             'add_realsense_d435i': 'True',
             
             #chooses the world
-            'world': PathJoinSubstitution([FindPackageShare('valm'), 'worlds', 'default_xarm5.world']),
+            'world': PathJoinSubstitution([FindPackageShare('valm'), 'worlds', 'vision_test.world']),
             
         }.items(),
     )
@@ -48,8 +48,28 @@ def generate_launch_description():
     name='controller',
     output='screen'
     )
-
+    
+    #defines the vision node
+    vision_node = Node(
+    package='valm',
+    executable='vision',
+    name='vision',
+    output='screen'
+    )
+    
+    #displays the image node
+    image_view = Node(
+    package='rqt_image_view',
+    executable='rqt_image_view',
+    name='camera_view',
+    #arguments=['/color/image_raw'],
+    arguments=['/vision/annotated_image'],
+    output='screen'
+    )
+    
     return LaunchDescription([
         robot_moveit_gazebo_launch,
         controller_node,
+        vision_node,
+        image_view
     ])

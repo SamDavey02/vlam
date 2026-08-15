@@ -1,0 +1,13 @@
+path: /home/sam/dev_ws/src/valm/gazebo_test_remapped
+
+train: test/images
+val: test/images
+test: test/images
+
+nc: 4
+
+names:
+  0: sliced_tomato
+  1: sliced_bread
+  2: cheese
+  3: lettuce
