@@ -36,6 +36,7 @@ setup(
             'controller = valm.controller:main',
             'vision = valm.vision:main',
             'capture_images = valm.capture_images:main',  #for getting the gazebo images
+            'language = valm.language:main',
         ],
     },
 )

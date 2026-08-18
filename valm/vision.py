@@ -1,12 +1,22 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
+from rclpy.time import Time
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 from ultralytics import YOLO
 
+import cv2
+import numpy as np
+
+from tf2_ros import Buffer, TransformListener
+from geometry_msgs.msg import PointStamped
+import tf2_geometry_msgs
+
+import json
+from std_msgs.msg import String
 
 class VisionNode(Node):
 
@@ -14,6 +24,22 @@ class VisionNode(Node):
         super().__init__('vision')
 
         self.bridge = CvBridge()
+        
+        # Camera info
+        self.fx = 640.5098266601562
+        self.fy = 640.5098266601562
+        self.cx = 640.0
+        self.cy = 360.0
+
+        # Depth image
+        self.depth_image = None
+        
+        # TF buffer
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(
+        	self.tf_buffer,
+        	self
+        )
 
         # Load trained YOLO segmentation model
         self.model = YOLO(
@@ -28,6 +54,14 @@ class VisionNode(Node):
             self.image_callback,
             qos_profile_sensor_data
         )
+        
+        # Subscribe to depth image
+        self.depth_subscription = self.create_subscription(
+            Image,
+            '/aligned_depth_to_color/image_raw',
+            self.depth_callback,
+            qos_profile_sensor_data
+        )
 
         # Publish annotated YOLO image
         self.annotated_pub = self.create_publisher(
@@ -37,6 +71,29 @@ class VisionNode(Node):
         )
 
         self.get_logger().info('Vision node started')
+        
+        # Publish scene for the language model
+        self.scene_publisher = self.create_publisher(
+            String,
+            "/scene_state",
+            10
+)
+        
+    def depth_callback(self, msg):
+    	
+    	try:
+    		# Depth topic uses 16UC1
+    		self.depth_image = self.bridge.imgmsg_to_cv2(
+    			msg,
+    			desired_encoding='passthrough'
+    		)
+    		
+    	except Exception as e:
+    		
+    		self.get_logger().error(
+    			f'Depth conversion failed: '
+    			f'{type(e).__name__}: {e}'
+    		)
 
     def image_callback(self, msg):
 
@@ -76,20 +133,209 @@ class VisionNode(Node):
 
             # Publish annotated image
             self.annotated_pub.publish(annotated_msg)
+            
+            # Depth and XYZ calculation
+            if (
+                self.depth_image is not None
+                and result.boxes is not None
+                and result.masks is not None
+            ):
+            
+                scene_objects = []
 
-            # Log detected objects
-            if result.boxes is not None:
-
-                for box in result.boxes:
+                for i, box in enumerate(result.boxes):
 
                     class_id = int(box.cls[0])
                     confidence = float(box.conf[0])
 
                     class_name = self.model.names[class_id]
 
-                    self.get_logger().info(
-                        f'{class_name}: {confidence:.2f}'
+                    # -----------------------------------------
+                    # Get segmentation mask
+                    # -----------------------------------------
+
+                    mask = result.masks.data[i].cpu().numpy()
+
+                    # Resize mask to original camera resolution
+                    mask = cv2.resize(
+                        mask,
+                        (
+                            frame.shape[1],
+                            frame.shape[0]
+                        ),
+                        interpolation=cv2.INTER_NEAREST
                     )
+
+                    mask_pixels = mask > 0.5
+
+                    # -----------------------------------------
+                    # Find pixels inside mask
+                    # -----------------------------------------
+
+                    ys, xs = np.where(mask_pixels)
+
+                    if len(xs) == 0:
+                        continue
+
+                    # Representative pixel position
+                    u = int(np.median(xs))
+                    v = int(np.median(ys))
+
+                    # -----------------------------------------
+                    # Check depth resolution
+                    # -----------------------------------------
+
+                    if (
+                        self.depth_image.shape[0]
+                        != frame.shape[0]
+                        or
+                        self.depth_image.shape[1]
+                        != frame.shape[1]
+                    ):
+
+                        self.get_logger().warn(
+                            'RGB and depth image sizes do not match'
+                        )
+
+                        continue
+
+                    # -----------------------------------------
+                    # Get depth values inside YOLO mask
+                    # -----------------------------------------
+
+                    depth_values = self.depth_image[
+                        mask_pixels
+                    ]
+
+                    # Remove invalid zero depth
+                    depth_values = depth_values[
+                        depth_values > 0
+                    ]
+
+                    if len(depth_values) == 0:
+
+                        self.get_logger().warn(
+                            f'No valid depth for {class_name}'
+                        )
+
+                        continue
+
+                    # -----------------------------------------
+                    # Calculate representative depth
+                    # -----------------------------------------
+
+                    depth_mm = np.median(depth_values)
+
+                    # 16UC1 depth:
+                    # millimetres -> metres
+                    Z = float(depth_mm) / 1000.0
+
+                    # -----------------------------------------
+                    # Pixel -> camera XYZ
+                    # -----------------------------------------
+
+                    X = (
+                        (u - self.cx)
+                        * Z
+                        / self.fx
+                    )
+
+                    Y = (
+                        (v - self.cy)
+                        * Z
+                        / self.fy
+                    )
+                    
+                    # Create point stamped camera frame
+                    
+                    camera_point = PointStamped()
+
+                    camera_point.header.frame_id = (
+                        'camera_color_optical_frame'
+                    )
+
+                    # Use latest available transform
+                    camera_point.header.stamp = (
+                        Time().to_msg()
+                    )
+
+                    camera_point.point.x = X
+                    camera_point.point.y = Y
+                    camera_point.point.z = Z
+                    
+                    # -----------------------------------------
+                    # Transform camera point -> link_base
+                    # -----------------------------------------
+
+                    try:
+
+                        base_point = self.tf_buffer.transform(
+                            camera_point,
+                            'link_base'
+                        )
+
+                        base_x = base_point.point.x
+                        base_y = base_point.point.y
+                        base_z = base_point.point.z
+                        
+                        scene_objects.append({
+                            "id": f"object_{i}",
+                            "label": class_name,  
+                            "confidence": confidence,
+                            "position": [
+                                float(base_x),
+                                float(base_y),
+                                float(base_z)
+                            ]
+                        })
+
+                        # Print
+                        self.get_logger().info(
+                            f'{class_name}: '
+                            f'conf={confidence:.2f}, '
+                            f'pixel=({u},{v}), '
+                            f'camera XYZ=('
+                            f'{X:.3f}, '
+                            f'{Y:.3f}, '
+                            f'{Z:.3f}) m, '
+                            f'base XYZ=('
+                            f'{base_x:.3f}, '
+                            f'{base_y:.3f}, '
+                            f'{base_z:.3f}) m'
+                        )
+                    
+                    except Exception as tf_error:
+
+                        self.get_logger().warn(
+                            f'TF transform failed for '
+                            f'{class_name}: '
+                            f'{tf_error}'
+                        )
+                         
+                # Publish full scene after processing all detections 
+                scene_msg = String()
+
+                scene_msg.data = json.dumps({
+                    "objects": scene_objects
+                })
+
+                self.scene_publisher.publish(
+                    scene_msg
+                )
+
+            # Log detected objects
+            #if result.boxes is not None:
+
+                #for box in result.boxes:
+
+                    #class_id = int(box.cls[0])
+                    #confidence = float(box.conf[0])
+
+                    #class_name = self.model.names[class_id]
+
+                    #self.get_logger().info(
+                        #f'{class_name}: {confidence:.2f}'
+                    #)
 
         except Exception as e:
 
