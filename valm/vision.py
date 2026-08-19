@@ -22,6 +22,12 @@ class VisionNode(Node):
 
     def __init__(self):
         super().__init__('vision')
+        
+        # So we can make sure tracked objects stay same order
+        self.tracked_objects = {}
+        self.next_object_id = 0
+
+        self.tracking_distance_threshold = 0.08
 
         self.bridge = CvBridge()
         
@@ -77,7 +83,57 @@ class VisionNode(Node):
             String,
             "/scene_state",
             10
-)
+        )
+        
+    def assign_object_id(self, class_name, position):
+
+        x, y, z = position
+
+        best_id = None
+        best_distance = float("inf")
+
+        for object_id, tracked in self.tracked_objects.items():
+
+            # Only match objects of the same class
+            if tracked["label"] != class_name:
+                continue
+
+            tx, ty, tz = tracked["position"]
+
+            distance = (
+                (x - tx) ** 2
+                + (y - ty) ** 2
+                + (z - tz) ** 2
+            ) ** 0.5
+
+            if (
+                distance < self.tracking_distance_threshold
+                and distance < best_distance
+            ):
+                best_distance = distance
+                best_id = object_id
+
+        # Existing object found
+        if best_id is not None:
+
+            self.tracked_objects[best_id] = {
+                "label": class_name,
+                "position": position
+            }
+
+            return best_id
+
+        # New object
+        new_id = f"object_{self.next_object_id}"
+
+        self.next_object_id += 1
+
+        self.tracked_objects[new_id] = {
+            "label": class_name,
+            "position": position
+        }
+
+        return new_id
         
     def depth_callback(self, msg):
     	
@@ -278,15 +334,17 @@ class VisionNode(Node):
                         base_y = base_point.point.y
                         base_z = base_point.point.z
                         
+                        
+                        # Defines each object with set object ID based on location
+                        position = [float(base_x), float(base_y), float(base_z)]
+
+                        object_id = self.assign_object_id(class_name, position)
+
                         scene_objects.append({
-                            "id": f"object_{i}",
-                            "label": class_name,  
+                            "id": object_id,
+                            "label": class_name,
                             "confidence": confidence,
-                            "position": [
-                                float(base_x),
-                                float(base_y),
-                                float(base_z)
-                            ]
+                            "position": position
                         })
 
                         # Print
