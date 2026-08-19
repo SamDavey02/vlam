@@ -4,6 +4,8 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
+import requests
+import traceback
 
 class LanguageNode(Node):
 
@@ -85,42 +87,55 @@ class LanguageNode(Node):
             )
 
     def instruction_callback(self, msg):
-        instruction = msg.data.strip()
 
-        if not instruction:
-            self.get_logger().warning(
-                "Received empty instruction"
-            )
-            return
+        try:
+            instruction = msg.data.strip()
 
-        self.get_logger().info(
-            f"Instruction received: {instruction}"
-        )
+            if not instruction:
+                self.get_logger().warning(
+                    "Received empty instruction"
+                )
+                return
 
-        if not self.scene["objects"]:
-            self.get_logger().warning(
-                "No objects currently available in scene"
+            self.get_logger().info(
+                f"Instruction received: {instruction}"
             )
 
-        plan = self.generate_plan(
-            instruction,
-            self.scene
-        )
+            if not self.scene["objects"]:
+                self.get_logger().warning(
+                    "No objects currently available in scene"
+                )
 
-        if not self.validate_plan(plan):
+            plan = self.generate_plan(
+                instruction,
+                self.scene
+            )
+
+            if not self.validate_plan(plan):
+                self.get_logger().error(
+                    "Generated plan failed validation"
+                )
+                return
+
+            output = String()
+            output.data = json.dumps(plan)
+
+            self.plan_publisher.publish(output)
+
+            self.get_logger().info(
+                f"Published action plan: {output.data}"
+            )
+
+        except Exception as error:
+
             self.get_logger().error(
-                "Generated plan failed validation"
+                f"Instruction callback crashed: "
+                f"{type(error).__name__}: {error}"
             )
-            return
 
-        output = String()
-        output.data = json.dumps(plan)
-
-        self.plan_publisher.publish(output)
-
-        self.get_logger().info(
-            f"Published action plan: {output.data}"
-        )
+            self.get_logger().error(
+                traceback.format_exc()
+            )
 
     def generate_plan(self, instruction, scene):
         prompt = self.build_prompt(
@@ -135,9 +150,196 @@ class LanguageNode(Node):
         
         # LLM goes here
 
+        try:
+
+            response = requests.post(
+                "http://127.0.0.1:8080/v1/chat/completions",
+                json={
+                    "model": "Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_K_M",
+
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a robot task planner. "
+                                "Follow the requested JSON schema exactly."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+
+                    "temperature": 0.1,
+
+                    "response_format": {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "robot_action_plan",
+                            "schema": {
+                                "type": "object",
+
+                                "properties": {
+
+                                    "actions": {
+                                        "type": "array",
+
+                                        "items": {
+                                            "oneOf": [
+
+                                                {
+                                                    "type": "object",
+
+                                                    "properties": {
+                                                        "action": {
+                                                            "const": "pick"
+                                                        },
+
+                                                        "object_id": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+
+                                                    "required": [
+                                                        "action",
+                                                        "object_id"
+                                                    ],
+
+                                                    "additionalProperties": False
+                                                },
+
+                                                {
+                                                    "type": "object",
+
+                                                    "properties": {
+                                                        "action": {
+                                                            "const": "place"
+                                                        },
+
+                                                        "object_id": {
+                                                            "type": "string"
+                                                        },
+
+                                                        "target": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+
+                                                    "required": [
+                                                        "action",
+                                                        "object_id",
+                                                        "target"
+                                                    ],
+
+                                                    "additionalProperties": False
+                                                },
+
+                                                {
+                                                    "type": "object",
+
+                                                    "properties": {
+                                                        "action": {
+                                                            "const": "move_relative"
+                                                        },
+
+                                                        "x": {
+                                                            "type": "number"
+                                                        },
+
+                                                        "y": {
+                                                            "type": "number"
+                                                        },
+
+                                                        "z": {
+                                                            "type": "number"
+                                                        }
+                                                    },
+
+                                                    "required": [
+                                                        "action",
+                                                        "x",
+                                                        "y",
+                                                        "z"
+                                                    ],
+
+                                                    "additionalProperties": False
+                                                },
+
+                                                {
+                                                    "type": "object",
+
+                                                    "properties": {
+                                                        "action": {
+                                                            "const": "stop"
+                                                        }
+                                                    },
+
+                                                    "required": [
+                                                        "action"
+                                                    ],
+
+                                                    "additionalProperties": False
+                                                }
+
+                                            ]
+                                        }
+                                    },
+
+                                    "error": {
+                                        "type": "string"
+                                    }
+                                },
+
+                                "required": [
+                                    "actions"
+                                ],
+
+                                "additionalProperties": False
+                            }
+                        }
+                    }
+                },
+
+                timeout=30
+            )
+
+            response.raise_for_status()
+
+            data = response.json()
+
+            content = (
+                data["choices"][0]["message"]["content"]
+            )
+
+            self.get_logger().info(
+                f"LLM response: {content}"
+            )
+
+            plan = json.loads(
+                content
+            )
+
+            return plan
+
+        except requests.RequestException as error:
+
+            self.get_logger().error(
+                f"LLM server request failed: {error}"
+            )
+
+        except (
+            KeyError,
+            json.JSONDecodeError
+        ) as error:
+
+            self.get_logger().error(
+                f"Invalid response from LLM: {error}"
+            )
+
         return {
-            "instruction": instruction,
-            "actions": []
+            "actions": [],
+            "error": "LLM planning failed"
         }
 
     def build_prompt(self, instruction, scene):
@@ -314,25 +516,53 @@ RULES
 
 13. Do not explain the plan.
 
+14. Generate only the actions necessary to satisfy
+    the user's instruction.
+
+15. Do not perform additional movement after a pick
+    unless the instruction requires movement.
+
+16. Do not place an object unless the instruction
+    requires placement.
+
 
 REQUIRED OUTPUT FORMAT
+
+Return a JSON object containing an "actions" array.
+
+Only generate the minimum number of actions required
+to complete the user's instruction.
+
+Do not add actions that were not requested.
+
+Examples:
+
+Instruction:
+"Pick up object_2"
+
+Output:
 
 {{
     "actions": [
         {{
             "action": "pick",
-            "object_id": "object_0"
-        }},
+            "object_id": "object_2"
+        }}
+    ]
+}}
+
+Instruction:
+"Move 5 cm upward"
+
+Output:
+
+{{
+    "actions": [
         {{
             "action": "move_relative",
             "x": 0.0,
             "y": 0.0,
             "z": 0.05
-        }},
-        {{
-            "action": "place",
-            "object_id": "object_0",
-            "target": "assembly_area"
         }}
     ]
 }}
