@@ -348,7 +348,7 @@
     <include>
       <uri>model://sliced_tomato</uri>
       <pose>
-        0.3 -0.6 1.00 1.57 0 0
+        0.3 -0.6 1.01 1.57 0 0
       </pose>
     </include>
     

@@ -35,8 +35,9 @@ setup(
         'console_scripts': [
             'controller = valm.controller:main',
             'vision = valm.vision:main',
-            'capture_images = valm.capture_images:main',  #for getting the gazebo images
+            'capture_images = valm.capture_images:main',  # For getting the gazebo images
             'language = valm.language:main',
+            'action_executor = valm.action_executor:main', # For robot movements
         ],
     },
 )

@@ -13,7 +13,7 @@
         <geometry>
           <mesh>
             <uri>model://sliced_tomato/meshes/CHAHIN_TOMATO_SLICE.obj</uri>
-            <scale>0.1 0.1 0.1</scale>
+            <scale>0.06 0.06 0.06</scale>
           </mesh>
         </geometry>
 
@@ -25,7 +25,7 @@
         <geometry>
           <mesh>
             <uri>model://sliced_tomato/meshes/CHAHIN_TOMATO_SLICE.obj</uri>
-            <scale>0.1 0.1 0.1</scale>
+            <scale>0.06 0.06 0.06</scale>
           </mesh>
         </geometry>
 

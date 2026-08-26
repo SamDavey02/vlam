@@ -348,19 +348,7 @@ class VisionNode(Node):
                         })
 
                         # Print
-                        self.get_logger().info(
-                            f'{class_name}: '
-                            f'conf={confidence:.2f}, '
-                            f'pixel=({u},{v}), '
-                            f'camera XYZ=('
-                            f'{X:.3f}, '
-                            f'{Y:.3f}, '
-                            f'{Z:.3f}) m, '
-                            f'base XYZ=('
-                            f'{base_x:.3f}, '
-                            f'{base_y:.3f}, '
-                            f'{base_z:.3f}) m'
-                        )
+                        #self.get_logger().info(f'{class_name}: 'f'conf={confidence:.2f}, 'f'pixel=({u},{v}), 'f'camera XYZ=('f'{X:.3f}, 'f'{Y:.3f}, 'f'{Z:.3f}) m, 'f'base XYZ=('f'{base_x:.3f}, 'f'{base_y:.3f}, 'f'{base_z:.3f}) m')
                     
                     except Exception as tf_error:
 
