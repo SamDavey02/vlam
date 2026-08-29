@@ -185,7 +185,7 @@ class VisionNode(Node):
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
 
             # Run YOLO instance segmentation
-            results = self.model.predict(source=frame, conf=0.25, device=0, verbose=False)
+            results = self.model.predict(source=frame, conf=0.6, device=0, verbose=False)
 
             result = results[0]
 
@@ -277,6 +277,65 @@ class VisionNode(Node):
 
                         # Log result
                         self.get_logger().info(f'{class_name}: 'f'shortest grip = 'f'{grip["width_pixels"]:.1f} px, 'f'{grip["width_m"] * 1000:.1f} mm, 'f'angle={grip["angle_deg"]:.1f} deg')
+                        
+                        # Get grip line endpoints in image pixels
+                        u1, v1 = grip["point1"]
+                        u2, v2 = grip["point2"]
+
+                        # Use the object's representative depth for both endpoints.
+                        # This keeps the grip line on the same object plane and avoids
+                        # depth noise at segmentation-mask boundaries.
+                        Z1 = Z
+                        Z2 = Z
+
+                        # Pixel -> camera XYZ for endpoint 1
+                        X1 = ((u1 - self.cx) * Z1 / self.fx)
+                        Y1 = ((v1 - self.cy) * Z1 / self.fy)
+
+                        # Pixel -> camera XYZ for endpoint 2
+                        X2 = ((u2 - self.cx) * Z2 / self.fx)
+                        Y2 = ((v2 - self.cy) * Z2 / self.fy)
+
+                        # Create PointStamped for endpoint 1
+                        p1_camera = PointStamped()
+                        p1_camera.header.frame_id = "camera_color_optical_frame"
+                        p1_camera.header.stamp = Time().to_msg()
+                        p1_camera.point.x = X1
+                        p1_camera.point.y = Y1
+                        p1_camera.point.z = Z1
+
+                        # Create PointStamped for endpoint 2
+                        p2_camera = PointStamped()
+                        p2_camera.header.frame_id = "camera_color_optical_frame"
+                        p2_camera.header.stamp = Time().to_msg()
+                        p2_camera.point.x = X2
+                        p2_camera.point.y = Y2
+                        p2_camera.point.z = Z2
+
+                        try:
+                            # Transform both endpoints into link_base
+                            p1_base = self.tf_buffer.transform(p1_camera, "link_base")
+
+                            p2_base = self.tf_buffer.transform(p2_camera, "link_base")
+
+                            dx_base = (p2_base.point.x - p1_base.point.x)
+
+                            dy_base = (p2_base.point.y - p1_base.point.y)
+
+                            # Angle of grip line in robot base frame
+                            grip_angle_base = float(np.degrees(np.arctan2(dy_base, dx_base)))
+
+                            # Normalize because parallel jaw gripper
+                            # has 180 degree symmetry
+                            grip_angle_base = ((grip_angle_base + 90.0) % 180.0) - 90.0
+
+                            grip["angle_base_deg"] = grip_angle_base
+
+                            self.get_logger().info(f'{class_name}: 'f'image angle={grip["angle_deg"]:.1f} deg, 'f'base angle={grip_angle_base:.1f} deg')
+
+                        except Exception as e:
+
+                            self.get_logger().warn(f'Grip endpoint TF failed for 'f'{class_name}: {e}')
                     
 
                     # Pixel -> camera XYZ
@@ -320,7 +379,12 @@ class VisionNode(Node):
                             scene_object["grip_width"] = float(grip["width_m"])
                             scene_object["grip_angle"] = float(grip["angle_deg"])
                             
+                            if "angle_base_deg" in grip:
+                                scene_object["grip_angle_base"] = float(grip["angle_base_deg"])
+                            
                         scene_objects.append(scene_object)
+                        
+                        self.get_logger().info(f'{class_name}: 'f'endpoint depths = 'f'{Z1:.3f} m, {Z2:.3f} m')
 
                         # Print
                         #self.get_logger().info(f'{class_name}: 'f'conf={confidence:.2f}, 'f'pixel=({u},{v}), 'f'camera XYZ=('f'{X:.3f}, 'f'{Y:.3f}, 'f'{Z:.3f}) m, 'f'base XYZ=('f'{base_x:.3f}, 'f'{base_y:.3f}, 'f'{base_z:.3f}) m')

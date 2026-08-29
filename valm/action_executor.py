@@ -130,13 +130,29 @@ class ActionExecutor(Node):
         object_x = float(position[0])
         object_y = float(position[1])
         object_z = float(position[2])
+        
+        
+        grip_width = obj.get("grip_width")
+        grip_angle_base = obj.get("grip_angle_base")
 
-        self.get_logger().info(f"pick: "f"{object_id}, "f"label={obj.get('label')}, "f"position={position}")
+        if grip_width is None:
+            self.get_logger().error(f"No grip_width available for {object_id}")
+            return False
 
+        if grip_angle_base is None:
+            self.get_logger().error(f"No grip_angle_base available for {object_id}")
+            return False
+
+        grip_width = float(grip_width)
+        grip_angle_base = float(grip_angle_base)
+        
+
+        self.get_logger().info(f"pick: "f"{object_id}, "f"label={obj.get('label')}, "f"position={position}, "f"grip_width={grip_width:.3f} m, "f"grip_angle_base={grip_angle_base:.1f} deg")
+        
         # Pick parameters 
         approach_height = 0.30
         grasp_offset = 0.02
-        lift_height = 0.10
+        lift_height = 0.20
 
         # Open gripper
         self.get_logger().info("Opening gripper")
@@ -156,26 +172,46 @@ class ActionExecutor(Node):
 
         q = current_pose.orientation
 
-        # Extract yaw from quaternion
+        
+        # Current yaw
         siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
-
         cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
 
-        yaw = math.atan2(siny_cosp,cosy_cosp)
+        current_yaw = math.atan2(siny_cosp, cosy_cosp)
 
-        # Force gripper downward:
-        # roll = pi
-        # pitch = 0
-        # preserve current yaw
+        # Vision grip angle + required gripper offset
+        desired_yaw = math.radians(grip_angle_base + 90.0)
+
+        # Normalize angular difference to [-pi, pi]
+        def angle_difference(target, current):
+            return math.atan2(math.sin(target - current), math.cos(target - current))
+
+        # A parallel-jaw gripper has 180-degree symmetry.
+        # Both of these represent the same grasp.
+        candidate_1 = desired_yaw
+        candidate_2 = desired_yaw + math.pi
+
+        difference_1 = angle_difference(candidate_1, current_yaw)
+
+        difference_2 = angle_difference(candidate_2, current_yaw)
+
+        # Choose whichever requires the least wrist rotation
+        if abs(difference_1) <= abs(difference_2):
+            yaw = current_yaw + difference_1
+        else:
+            yaw = current_yaw + difference_2
+
+        self.get_logger().info(f"Current yaw={math.degrees(current_yaw):.1f} deg, "f"grip angle={grip_angle_base:.1f} deg, "f"selected yaw={math.degrees(yaw):.1f} deg")
+
+        # Downward-facing gripper
         half_yaw = yaw / 2.0
 
         orientation = Quaternion()
-
         orientation.x = math.cos(half_yaw)
         orientation.y = math.sin(half_yaw)
         orientation.z = 0.0
         orientation.w = 0.0
-
+        
         self.get_logger().info(f"Moving above object: "f"x={object_x:.3f}, "f"y={object_y:.3f}, "f"z={approach_z:.3f}")
 
         if not await self.robot.move_to_pose(object_x,object_y,approach_z,orientation):
@@ -188,7 +224,7 @@ class ActionExecutor(Node):
 
         # Move down to grasp
         eef_to_tcp_offset = 0.172
-        grasp_depth = 0.020
+        grasp_depth = 0.010
 
         grasp_z = (object_z + eef_to_tcp_offset - grasp_depth)
 
@@ -203,10 +239,18 @@ class ActionExecutor(Node):
         #return True
             
         # Close gripper
-        self.get_logger().info("Closing gripper")
+        gripper_position = self.robot.width_to_gripper_position(grip_width)
 
-        if not await self.robot.close_gripper():
+        self.get_logger().info(f"Closing gripper for object width "f"{grip_width * 1000:.1f} mm -> "f"drive_joint={gripper_position:.3f}")
+
+        if not await self.robot.close_gripper(gripper_position):
             self.get_logger().error("Failed to close gripper")
+            return False
+            
+        max_gripper_width = 0.086
+
+        if grip_width > max_gripper_width:
+            self.get_logger().error(f"Cannot grasp {object_id}: "f"object width={grip_width * 1000:.1f} mm, "f"gripper maximum={max_gripper_width * 1000:.1f} mm")
             return False
             
         # Lift object

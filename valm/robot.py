@@ -246,7 +246,7 @@ class Robot:
 
         point.positions = [float(position)]
 
-        point.time_from_start.sec = 1
+        point.time_from_start.sec = 5
         point.time_from_start.nanosec = 0
 
         goal.trajectory.points.append(point)
@@ -264,14 +264,30 @@ class Robot:
         self.node.get_logger().info(f"Gripper movement completed: {position:.3f}")
 
         return True
+            
+    def width_to_gripper_position(self, width_m, grip_compression=-0):
+
+        max_opening = 0.086
+        max_joint_position = 0.85
+
+        # Close slightly further than the measured object width
+        target_width = width_m - grip_compression
+
+        # Prevent invalid widths
+        target_width = max(0.0, min(target_width, max_opening))
+
+        # Convert opening width to drive_joint position
+        position = max_joint_position * (1.0 - (target_width / max_opening))
+
+        return position
         
     async def open_gripper(self):
         return await self.set_gripper(0.0)
 
-    async def close_gripper(self):
-        return await self.set_gripper(0.85)
+    async def close_gripper(self, position=0.85):
+        return await self.set_gripper(position)
+        #return await self.set_gripper(0.3)
 
-        
     def get_joint_positions(self):
         return self.joint_positions.copy()
         
