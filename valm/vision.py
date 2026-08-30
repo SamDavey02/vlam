@@ -177,7 +177,147 @@ class VisionNode(Node):
         grip_angle = ((grip_angle + 90.0) % 180.0) - 90.0
 
         return {"point1": (int(p1[0]),int(p1[1])), "point2": (int(p2[0]),int(p2[1])), "center": (int(cx), int(cy)), "width_pixels": grip_width_pixels, "width_m": grip_width_m, "angle_deg": grip_angle}
+        
+    
+    def sample_depth_at_pixel(self, point, radius=3):
 
+        if self.depth_image is None:
+            return None
+
+        u = int(round(point[0]))
+        v = int(round(point[1]))
+
+        height, width = self.depth_image.shape
+
+        # Make sure pixel is inside image
+        if not (0 <= u < width and 0 <= v < height):
+            return None
+
+        # Create small patch around pixel
+        x1 = max(0, u - radius)
+        x2 = min(width, u + radius + 1)
+
+        y1 = max(0, v - radius)
+        y2 = min(height, v + radius + 1)
+
+        patch = self.depth_image[y1:y2, x1:x2]
+
+        # Remove invalid depth values
+        valid_depths = patch[(patch > 0) & np.isfinite(patch)]
+
+        if len(valid_depths) == 0:
+            return None
+
+        # Median is more resistant to noisy depth pixels
+        depth_mm = np.median(valid_depths)
+
+        # Convert mm -> metres
+        depth_m = float(depth_mm) / 1000.0
+
+        return depth_m
+    
+    
+    def get_local_surface_depths(self, grip, mask_pixels, clearance_px=25, max_search_px=100):
+
+        p1 = np.array(grip["point1"], dtype=np.float32)
+
+        p2 = np.array(grip["point2"], dtype=np.float32)
+
+        # Direction of shortest grip line
+        direction = p2 - p1
+
+        length = np.linalg.norm(direction)
+
+        if length < 1.0:
+            return None
+
+        # Unit direction vector
+        direction = direction / length
+
+        height, width = mask_pixels.shape
+
+        def find_outside_point(start_point, outward_direction):
+
+            point = start_point.copy()
+
+            # Walk outward until we're outside the object mask
+            for distance in range(max_search_px):
+
+                point = (start_point + outward_direction * distance)
+
+                u = int(round(point[0]))
+                v = int(round(point[1]))
+
+                # Stop if outside image
+                if not (0 <= u < width and 0 <= v < height):
+                    return None
+
+                # Mask value False means we're outside object
+                if not mask_pixels[v, u]:
+
+                    # Move a little further away from object
+                    point = (point + outward_direction * clearance_px)
+
+                    u = int(round(point[0]))
+                    v = int(round(point[1]))
+
+                    if not (0 <= u < width and 0 <= v < height):
+                        return None
+
+                    return point
+
+            return None
+
+        # Point 1 needs to move opposite the grip-line direction
+        sample1 = find_outside_point(p1, -direction)
+
+        # Point 2 moves along the grip-line direction
+        sample2 = find_outside_point(p2, direction)
+
+        if sample1 is None or sample2 is None:
+            return None
+
+        # Get depth beside each side of the object
+        depth1 = self.sample_depth_at_pixel(sample1, radius=3)
+
+        depth2 = self.sample_depth_at_pixel(sample2, radius=3)
+
+        if depth1 is None or depth2 is None:
+            return None
+
+        return {"sample1_pixel": (int(round(sample1[0])), int(round(sample1[1]))), "sample2_pixel": (int(round(sample2[0])), int(round(sample2[1]))), "depth1": depth1, "depth2": depth2}
+        
+        
+    def pixel_depth_to_base(self, pixel, depth_m):
+
+        if depth_m is None:
+            return None
+
+        u, v = pixel
+        Z = float(depth_m)
+
+        # Pixel -> camera 3D coordinates
+        X = ((u - self.cx) * Z) / self.fx
+        Y = ((v - self.cy) * Z) / self.fy
+
+        point_camera = PointStamped()
+        point_camera.header.frame_id = "camera_color_optical_frame"
+        point_camera.header.stamp = Time().to_msg()
+
+        point_camera.point.x = float(X)
+        point_camera.point.y = float(Y)
+        point_camera.point.z = float(Z)
+
+        try:
+            point_base = self.tf_buffer.transform(point_camera, "link_base")
+
+            return [float(point_base.point.x), float(point_base.point.y), float(point_base.point.z)]
+
+        except Exception as error:
+            self.get_logger().warn(f"Surface point TF failed: {error}")
+
+            return None
+        
     def image_callback(self, msg):
 
         try:
@@ -259,8 +399,37 @@ class VisionNode(Node):
                     # Calculate shortest gripping width
                     
                     grip = self.calculate_shortest_grip(mask_pixels, Z)
-
+                    
+                    surface = None
+                    
                     if grip is not None:
+                    
+                        surface = self.get_local_surface_depths(grip, mask_pixels)
+                        
+                        if surface is not None:
+                        
+                            cv2.circle(annotated_frame, surface["sample1_pixel"], 6, (255, 0, 0), -1)
+
+                            cv2.circle(annotated_frame, surface["sample2_pixel"], 6, (255, 0, 0), -1)
+
+                            self.get_logger().info(f"{class_name}: "f"surface depth 1={surface['depth1']:.3f} m, "f"surface depth 2={surface['depth2']:.3f} m")
+                            
+                            surface_point1_base = self.pixel_depth_to_base(surface["sample1_pixel"], surface["depth1"])
+
+                            surface_point2_base = self.pixel_depth_to_base(surface["sample2_pixel"], surface["depth2"])
+
+                            if (surface_point1_base is not None and surface_point2_base is not None):
+
+                                surface["point1_base"] = surface_point1_base
+                                surface["point2_base"] = surface_point2_base
+
+                                surface["surface_z_1"] = surface_point1_base[2]
+                                surface["surface_z_2"] = surface_point2_base[2]
+
+                                # Highest surface point is safest
+                                surface["surface_z"] = max(surface["surface_z_1"], surface["surface_z_2"])
+
+                                self.get_logger().info(f"{class_name}: "f"surface Z1={surface['surface_z_1']:.4f} m, "f"surface Z2={surface['surface_z_2']:.4f} m, "f"safe surface Z={surface['surface_z']:.4f} m")
 
                         # Draw shortest grip line
                         cv2.line(annotated_frame, grip["point1"], grip["point2"], (0, 255, 255), 3)
@@ -381,6 +550,15 @@ class VisionNode(Node):
                             
                             if "angle_base_deg" in grip:
                                 scene_object["grip_angle_base"] = float(grip["angle_base_deg"])
+                                
+                            # Add local surface information
+                        if surface is not None and "surface_z" in surface:
+                        
+                            scene_object["surface_z_1"] = float(surface["surface_z_1"])
+                            scene_object["surface_z_2"] = float(surface["surface_z_2"])
+                            scene_object["surface_z"] = float(surface["surface_z"])
+                            
+                            self.get_logger().info(f'{class_name}: 'f'surface Z1={surface["surface_z_1"]:.4f} m, 'f'surface Z2={surface["surface_z_2"]:.4f} m, 'f'safe surface Z={surface["surface_z"]:.4f} m')
                             
                         scene_objects.append(scene_object)
                         

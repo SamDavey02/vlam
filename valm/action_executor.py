@@ -224,9 +224,47 @@ class ActionExecutor(Node):
 
         # Move down to grasp
         eef_to_tcp_offset = 0.172
+
+        # How far below the detected object point
+        # we would normally try to grasp
         grasp_depth = 0.010
 
-        grasp_z = (object_z + eef_to_tcp_offset - grasp_depth)
+        # Keep the bottom of the gripper this far
+        # above the locally measured surface
+        surface_safety_margin = 0.002
+
+
+        # Normal grasp position
+        desired_grasp_z = (object_z + eef_to_tcp_offset - grasp_depth)
+
+        # Get the local surface height measured
+        # beside this specific object
+        surface_z = obj.get("surface_z")
+
+
+        if surface_z is not None:
+
+            surface_z = float(surface_z)
+
+            # Lowest safe EEF position.
+            # This prevents the gripper from descending
+            # too close to / into the table or surface.
+            minimum_safe_grasp_z = (surface_z + eef_to_tcp_offset + surface_safety_margin)
+
+            # Use whichever value keeps the robot higher
+            grasp_z = max(desired_grasp_z, minimum_safe_grasp_z)
+
+            self.get_logger().info(f"Grasp height calculation: "f"object_z={object_z:.4f} m, "f"surface_z={surface_z:.4f} m, "f"desired_z={desired_grasp_z:.4f} m, "f"minimum_safe_z={minimum_safe_grasp_z:.4f} m, "f"final_z={grasp_z:.4f} m")
+
+        else:
+
+            # Fall back to normal grasp calculation
+            # if vision did not provide surface_z
+            grasp_z = desired_grasp_z
+
+            self.get_logger().warn(f"No surface_z available for {object_id}; "f"using normal grasp depth")
+
+        self.get_logger().info(f"Moving to grasp position: "f"x={object_x:.3f}, "f"y={object_y:.3f}, "f"z={grasp_z:.3f}")
 
         self.get_logger().info(f"Moving to grasp position: "f"x={object_x:.3f}, "f"y={object_y:.3f}, "f"z={grasp_z:.3f}")
 

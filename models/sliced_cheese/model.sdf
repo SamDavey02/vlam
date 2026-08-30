@@ -13,7 +13,7 @@
         <geometry>
           <mesh>
             <uri>model://sliced_cheese/meshes/cheeseCut.obj</uri>
-            <scale>0.4 0.4 0.4</scale>
+            <scale>0.24 0.24 0.24</scale>
           </mesh>
         </geometry>
 
@@ -25,7 +25,7 @@
         <geometry>
           <mesh>
             <uri>model://sliced_cheese/meshes/cheeseCut.obj</uri>
-            <scale>0.4 0.4 0.4</scale>
+            <scale>0.24 0.24 0.24</scale>
           </mesh>
         </geometry>
 

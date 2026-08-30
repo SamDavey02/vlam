@@ -13,7 +13,7 @@
         <geometry>
           <mesh>
             <uri>model://lettuce/meshes/Head_of_Lettuce_01.obj</uri>
-            <scale>0.02 0.02 0.02</scale>
+            <scale>0.012 0.012 0.012</scale>
           </mesh>
         </geometry>
 
@@ -25,7 +25,7 @@
         <geometry>
           <mesh>
             <uri>model://lettuce/meshes/Head_of_Lettuce_01.obj</uri>
-            <scale>0.02 0.02 0.02</scale>
+            <scale>0.012 0.012 0.012</scale>
           </mesh>
         </geometry>
 
