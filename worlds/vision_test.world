@@ -325,7 +325,7 @@
     <include>
       <uri>model://lettuce</uri>
       <pose>
-        0.4 -0.4 1.1 0 0 0
+        0.31 -0.53 1.07 0 0 0
       </pose>
     </include>
     
@@ -333,7 +333,7 @@
       <name>sliced_bread_1</name>
       <uri>model://sliced_bread</uri>
       <pose>
-        0.5 -0.6 1.03 0 0 0
+        0.37 -0.6 1.03 0 0 0
       </pose>
     </include>
     
@@ -341,21 +341,21 @@
       <name>sliced_bread_2</name>
       <uri>model://sliced_bread</uri>
       <pose>
-        0.5 -0.8 1.03 0 0 0
+        0.37 -0.8 1.03 0 0 0
       </pose>
     </include>
     
     <include>
       <uri>model://sliced_tomato</uri>
       <pose>
-        0.3 -0.6 1.01 1.57 0 0
+        0.19 -0.6 1.02 1.57 0 0
       </pose>
     </include>
     
     <include>
       <uri>model://sliced_cheese</uri>
       <pose>
-        0.3 -0.8 1.02 1.57 0 0
+        0.23 -0.8 1.02 1.57 0 0
       </pose>
     </include>
     

@@ -8,6 +8,28 @@
 
     <link name="link">
 
+      <!-- Make sure gravity affects the tomato -->
+      <gravity>true</gravity>
+
+      <!-- Simple mass and inertia -->
+      <inertial>
+
+        <mass>0.02</mass>
+
+        <inertia>
+          <ixx>0.00001</ixx>
+          <iyy>0.00001</iyy>
+          <izz>0.00001</izz>
+
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+
+      </inertial>
+
+
+      <!-- Visual mesh -->
       <visual name="visual">
 
         <geometry>
@@ -20,6 +42,10 @@
       </visual>
 
 
+      <!--
+        For now use the same mesh for collision.
+        This keeps the collision aligned with the visible model.
+      -->
       <collision name="collision">
 
         <geometry>
@@ -28,6 +54,27 @@
             <scale>0.045 0.045 0.045</scale>
           </mesh>
         </geometry>
+
+        <surface>
+
+          <friction>
+            <ode>
+              <mu>1.0</mu>
+              <mu2>1.0</mu2>
+            </ode>
+          </friction>
+
+          <contact>
+            <ode>
+              <kp>100000</kp>
+              <kd>10</kd>
+
+              <max_vel>0.01</max_vel>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+
+        </surface>
 
       </collision>
 

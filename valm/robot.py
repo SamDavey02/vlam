@@ -265,7 +265,7 @@ class Robot:
 
         return True
             
-    def width_to_gripper_position(self, width_m, grip_compression=0.001):
+    def width_to_gripper_position(self, width_m, grip_compression=0.004):
 
         max_opening = 0.086
         max_joint_position = 0.85

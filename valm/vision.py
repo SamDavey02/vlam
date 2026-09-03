@@ -175,8 +175,11 @@ class VisionNode(Node):
         # Angle of gripping line in image
         grip_angle = float(np.degrees(np.arctan2(dy_pixels,dx_pixels)))
         grip_angle = ((grip_angle + 90.0) % 180.0) - 90.0
-
-        return {"point1": (int(p1[0]),int(p1[1])), "point2": (int(p2[0]),int(p2[1])), "center": (int(cx), int(cy)), "width_pixels": grip_width_pixels, "width_m": grip_width_m, "angle_deg": grip_angle}
+        
+        # Midpoint of the shortest grip line
+        grip_midpoint = (int(round((p1[0] + p2[0]) / 2.0)), int(round((p1[1] + p2[1]) / 2.0)))
+        
+        return {"point1": (int(p1[0]),int(p1[1])), "point2": (int(p2[0]),int(p2[1])), "center": (int(cx), int(cy)), "midpoint": grip_midpoint, "width_pixels": grip_width_pixels, "width_m": grip_width_m, "angle_deg": grip_angle}
         
     
     def sample_depth_at_pixel(self, point, radius=3):
@@ -401,8 +404,15 @@ class VisionNode(Node):
                     grip = self.calculate_shortest_grip(mask_pixels, Z)
                     
                     surface = None
-                    
+                    grip_position_base = None
+                                        
                     if grip is not None:
+                    
+                        # Get midpoint calculated by calculate_shortest_grip()
+                        grip_midpoint = grip["midpoint"]
+
+                        # Convert midpoint into robot base coordinates
+                        grip_position_base = self.pixel_depth_to_base(grip_midpoint, Z)
                     
                         surface = self.get_local_surface_depths(grip, mask_pixels)
                         
@@ -438,6 +448,9 @@ class VisionNode(Node):
                         cv2.circle(annotated_frame, grip["point1"], 5, (0, 0, 255), -1)
 
                         cv2.circle(annotated_frame, grip["point2"], 5, (0, 0, 255), -1)
+                        
+                        # Draw grip midpoint
+                        cv2.circle(annotated_frame, grip_midpoint, 7, (0, 255, 0), -1)
 
                         # Label showing physical width
                         label_position = (grip["center"][0] + 10, grip["center"][1])
@@ -551,6 +564,10 @@ class VisionNode(Node):
                             if "angle_base_deg" in grip:
                                 scene_object["grip_angle_base"] = float(grip["angle_base_deg"])
                                 
+                            # Add grasp midpoint in robot base frame
+                            if grip_position_base is not None:
+                                scene_object["grip_position"] = [float(grip_position_base[0]), float(grip_position_base[1]), float(grip_position_base[2])]
+                                
                             # Add local surface information
                         if surface is not None and "surface_z" in surface:
                         
@@ -559,6 +576,7 @@ class VisionNode(Node):
                             scene_object["surface_z"] = float(surface["surface_z"])
                             
                             self.get_logger().info(f'{class_name}: 'f'surface Z1={surface["surface_z_1"]:.4f} m, 'f'surface Z2={surface["surface_z_2"]:.4f} m, 'f'safe surface Z={surface["surface_z"]:.4f} m')
+                            
                             
                         scene_objects.append(scene_object)
                         

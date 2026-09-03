@@ -131,6 +131,19 @@ class ActionExecutor(Node):
         object_y = float(position[1])
         object_z = float(position[2])
         
+        grip_position = obj.get("grip_position")
+
+        if grip_position is not None and len(grip_position) == 3:
+            grasp_x = float(grip_position[0])
+            grasp_y = float(grip_position[1])
+
+            self.get_logger().info(f"Using grip midpoint: "f"x={grasp_x:.4f}, y={grasp_y:.4f}")
+
+        else:
+            grasp_x = object_x
+            grasp_y = object_y
+
+            self.get_logger().warn(f"No grip_position for {object_id}; "f"using object centre")
         
         grip_width = obj.get("grip_width")
         grip_angle_base = obj.get("grip_angle_base")
@@ -212,9 +225,9 @@ class ActionExecutor(Node):
         orientation.z = 0.0
         orientation.w = 0.0
         
-        self.get_logger().info(f"Moving above object: "f"x={object_x:.3f}, "f"y={object_y:.3f}, "f"z={approach_z:.3f}")
+        self.get_logger().info(f"Moving above object: "f"x={grasp_x:.3f}, "f"y={grasp_y:.3f}, "f"z={approach_z:.3f}")
 
-        if not await self.robot.move_to_pose(object_x,object_y,approach_z,orientation):
+        if not await self.robot.move_to_pose(grasp_x,grasp_y,approach_z,orientation):
             self.get_logger().error("Failed to move above object")
             return False
             
@@ -227,11 +240,11 @@ class ActionExecutor(Node):
 
         # How far below the detected object point
         # we would normally try to grasp
-        grasp_depth = 0.010
+        grasp_depth = 0.020
 
         # Keep the bottom of the gripper this far
         # above the locally measured surface
-        surface_safety_margin = 0.002
+        surface_safety_margin = 0.000
 
 
         # Normal grasp position
@@ -266,9 +279,7 @@ class ActionExecutor(Node):
 
         self.get_logger().info(f"Moving to grasp position: "f"x={object_x:.3f}, "f"y={object_y:.3f}, "f"z={grasp_z:.3f}")
 
-        self.get_logger().info(f"Moving to grasp position: "f"x={object_x:.3f}, "f"y={object_y:.3f}, "f"z={grasp_z:.3f}")
-
-        if not await self.robot.move_to_pose(object_x, object_y, grasp_z, orientation):
+        if not await self.robot.move_to_pose(grasp_x, grasp_y, grasp_z, orientation):
             self.get_logger().error("Failed to move to grasp position")
             return False
             
@@ -296,7 +307,7 @@ class ActionExecutor(Node):
 
         self.get_logger().info(f"Lifting object to "f"z={lift_z:.3f}")
 
-        if not await self.robot.move_to_pose(object_x,object_y,lift_z,orientation):
+        if not await self.robot.move_to_pose(grasp_x,grasp_y,lift_z,orientation):
             self.get_logger().error("Failed to lift object")
             return False
 
